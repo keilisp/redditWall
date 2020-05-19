@@ -1,8 +1,6 @@
-// TODO: check if image is HD
 // TODO: implement commander.js (with sys.args command)
 // TODO: comments
 // TODO: refactor
-// TODO: export fucntions to modules
 // TODO: add 18+ constrol
 
 const fs = require("fs")
@@ -122,7 +120,6 @@ const isHD = (post, minWidth, minHeight) => {
 // Get posts
 const getPosts = async (url, loops, after) => {
   const allPosts = []
-
   for(let i = 0; i < loops; i++) {
 	try {
 	  const posts = await axios.get(url, {
