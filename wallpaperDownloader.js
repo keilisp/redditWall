@@ -16,8 +16,7 @@ const homedir = os.homedir()
 // Folder where images will be stored
 const destDirectory = `${homedir}/Pictures/Reddit`
 // Which subreddit to download from
-const subreddit = "awwnime"
-// const subreddit = "dksfjsk"
+const subreddit = "wallpapers"
 // For reddit pagination (Leave empty)
 const after = ''
 // Minimum width of image
