@@ -3,6 +3,7 @@
 // TODO: comments
 // TODO: refactor
 // TODO: export fucntions to modules
+// TODO: add 18+ constrol
 
 const fs = require("fs")
 const url = require("url")
@@ -13,9 +14,9 @@ const os = require("os")
 // Home directory
 const homedir = os.homedir()
 // Folder where images will be stored
-const destDirectory = `${homedir}/Pictures/wallpapers/Reddit`
+const destDirectory = `${homedir}/Pictures/Reddit`
 // Which subreddit to download from
-const subreddit = "Animewallpaper"
+const subreddit = "awwnime"
 // const subreddit = "dksfjsk"
 // For reddit pagination (Leave empty)
 const after = ''
@@ -24,11 +25,17 @@ const minWidth = 1920
 // Minimum height of image
 const minHeight = 1080
 // How many posts to get for each request (Max 100)
-const reqLimit = 30
+const reqLimit = 100
 // Loop count to iterate for request
 const reqLoops = 1
+// Posts time (hour, day, week, month, year, all)
+const postTime = 'all'
+// Posts type (hot, new, random, rising, top)
+const postType = 'top'
+// Wallpaper type (Mobile, Desktop (for r/Animewallpaper))
+const imgType = ""
 // Subreddit url
-const redditUrl = `https://reddit.com/r/${subreddit}/top/.json?t=all&limit=${reqLimit}&after=${after}`
+const redditUrl = `https://reddit.com/r/${subreddit}/${postType}/.json?t=${postTime}&limit=${reqLimit}&after=${after}`
 
 
 // Check if url is valid
@@ -80,6 +87,38 @@ const verifySubreddit = async subreddit => {
   }
 }
 
+// Check if wallpapers type is set and get it if yes
+const getImgType = ( post, imgType ) => {
+  if (imgType.length !== 0) {
+	return imgType
+  }else {
+	return false
+  }
+}
+
+// Check if the image match current imgType
+const isMatchImgType = (post) => {
+  const postFlairText = post['data']['link_flair_text']
+  if ( postFlairText == getImgType(post, imgType)){
+	return true
+  }else{
+	console.log('Image don\'t match current imgType')
+	return false
+  }
+}
+
+// Check if the image is HD
+const isHD = (post, minWidth, minHeight) => {
+  const imgWidth = post['data']['preview']['images'][0]['source']['width']
+  const imgHeight = post['data']['preview']['images'][0]['source']['height']
+  if( imgWidth < minWidth || imgHeight < minHeight){
+	console.log('Image isn\'t HD')
+	return false
+  }else{
+	return true
+  }
+}
+
 
 // Get posts
 const getPosts = async (url, loops, after) => {
@@ -93,9 +132,15 @@ const getPosts = async (url, loops, after) => {
 		}
 	  })
 	  for (let post of posts['data']['data']['children']){
-		allPosts.push(post)
+		if( getImgType(post, imgType) ) {
+		  if(isMatchImgType(post)){
+			allPosts.push(post)
+		  }
+		}else{
+		  allPosts.push(post)
+		}
 	  }
-	  after = posts['data']['after']
+	  after = posts['data']['data']['after']
 
 	}catch (err){
 	  console.log(err)
@@ -165,7 +210,13 @@ const main = async () => {
   const posts  = await getPosts(redditUrl, reqLoops, after)
   for (let post of posts) {
 	let imgUrl = post['data']['url']
-	if (isUrlValid(imgUrl) && isUrlTrusted(imgUrl) && isUrlImg(imgUrl) && !isAlreadyDownloaded(destDirectory, imgUrl)){
+	if (
+	  isUrlValid(imgUrl) &&
+	  isUrlTrusted(imgUrl) &&
+	  isUrlImg(imgUrl) &&
+	  !isAlreadyDownloaded(destDirectory, imgUrl) &&
+	  isHD(post, minWidth, minHeight)
+	){
 	  await downloadImg(destDirectory, imgUrl)
 	}
   }
