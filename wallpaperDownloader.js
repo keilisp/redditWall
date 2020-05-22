@@ -1,39 +1,89 @@
-// TODO: implement commander.js (with sys.args command)
-// TODO: comments
+#!/usr/bin/env node
+
+// TODO: implement https://github.com/nodeca/probe-image-size
+// TODO: separate dekstop & mobiles
+// TODO: TESTS!
 // TODO: refactor
-// TODO: add 18+ constrol
 
 const fs = require("fs")
 const url = require("url")
 const path = require("path")
 const axios = require("axios")
 const os = require("os")
+const { program } = require('commander')
+
+program
+  .requiredOption('-s, --subreddit <subreddit>', 'Specify subbreddit [REQUIRED]')
+  .option('-d, --desktop', 'Download only desktop wallpapers')
+  .option('-n, --nsfw', 'Include 18+ images')
+// .option('-f, --folder <folder>', 'Destination folder', '$HOME/Pictures/Reddit')
+  .option('-t, --time <time>', 'Specify posts time (hour, day, week, month, year, all)', 'day')
+  .option('-p, --type <type>', 'Specify posts type (hot, new, random, rising, top)', 'new')
+  .option('-l, --limit <limit>', 'Specify how many posts to get (max 100)', 25)
+  .option('-mw, --minwidth <width>', 'Specify minimal width of the image', 1920)
+  .option('-mh, --minheight <height>', 'Specify minimal height of the image', 1080)
+
+program.parse(process.argv)
 
 // Home directory
 const homedir = os.homedir()
 // Folder where images will be stored
 const destDirectory = `${homedir}/Pictures/Reddit`
+
+// Request config
+// How many posts to get for each request (Max 100)
+const reqLimit = parseInt(program.limit, 10)
+if (reqLimit > 100 || reqLimit < 1){
+  console.log('Error: Incorrect limit value');
+  console.log('Possible value: max - 100, min - 1')
+  process.exit(0)
+}
+// Posts time (hour, day, week, month, year, all)
+const postTime = program.time
+if (
+  postTime !== 'hour' &&
+  postTime !== 'day'  &&
+  postTime !== 'week' &&
+  postTime !== 'month' &&
+  postTime !== 'year' &&
+  postTime !== 'all' ){
+  console.log('Error: Incorrect time value');
+  console.log('Possible value: hour, day, week, month, year, all')
+  process.exit(0)
+}
+// Posts type (hot, new, random, rising, top)
+const postType = program.type
+if (
+  postType !== 'hot' &&
+  postType !== 'new'  &&
+  postType !== 'random' &&
+  postType !== 'rising' &&
+  postType !== 'top'){
+  console.log('Error: Incorrect type value');
+  console.log('Possible value: hot, new, random, rising, top')
+  process.exit(0)
+}
 // Which subreddit to download from
-const subreddit = "wallpapers"
+const subreddit = program.subreddit
 // For reddit pagination (Leave empty)
 const after = ''
-// Minimum width of image
-const minWidth = 1920
-// Minimum height of image
-const minHeight = 1080
-// How many posts to get for each request (Max 100)
-const reqLimit = 100
-// Loop count to iterate for request
-const reqLoops = 1
-// Posts time (hour, day, week, month, year, all)
-const postTime = 'all'
-// Posts type (hot, new, random, rising, top)
-const postType = 'top'
-// Wallpaper type (Mobile, Desktop (for r/Animewallpaper))
-const imgType = ""
 // Subreddit url
 const redditUrl = `https://reddit.com/r/${subreddit}/${postType}/.json?t=${postTime}&limit=${reqLimit}&after=${after}`
 
+// Wallpaper config
+// Minimum width of image
+const minWidth = program.minwidth
+// Minimum height of image
+const minHeight = program.minheight
+
+// Search config
+// Search only for desktops
+let searchForDesktop = program.desktop ? true : false
+// Include 18+ images in search
+let includeNSFW = program.nsfw ? true : false
+
+// Downloaded images counter
+let imgDownloadCount = 0
 
 // Check if url is valid
 const isUrlValid = async url => {
@@ -50,7 +100,24 @@ const isUrlValid = async url => {
 	  return true
 	}
   }catch {
-	console.log('ERROR!')
+	console.log('Image url is not valid!')
+	return false
+  }
+}
+
+// Check if image for desktop
+const isImgDesktop = post => {
+  if (post['data']['preview']){
+	const imgWidth = post['data']['preview']['images'][0]['source']['width']
+	const imgHeight = post['data']['preview']['images'][0]['source']['height']
+	if( imgWidth > imgHeight){
+	  return true
+	}else {
+	  console.log('Img isn\'t for desktops... Skipping')
+	  return false
+	}
+  }else{
+	console.log('Cant find image resolution... Skipping')
 	return false
   }
 }
@@ -64,7 +131,7 @@ const prepareDirectory = async directory => {
 }
 
 // Check if subbrediit exists
-const verifySubreddit = async subreddit => {
+const isSubredditOk = async subreddit => {
   try {
 	let subredditUrl = `https://reddit.com/r/${subreddit}.json`
 	let res = await axios.get(subredditUrl, {
@@ -80,27 +147,8 @@ const verifySubreddit = async subreddit => {
 	  return true
 	}
   }catch {
-	console.log('verifySubreddit ERROR!')
-  }
-}
-
-// Check if wallpapers type is set and get it if yes
-const getImgType = ( post, imgType ) => {
-  if (imgType.length !== 0) {
-	return imgType
-  }else {
-	return false
-  }
-}
-
-// Check if the image match current imgType
-const isMatchImgType = (post) => {
-  const postFlairText = post['data']['link_flair_text']
-  if ( postFlairText == getImgType(post, imgType)){
-	return true
-  }else{
-	console.log('Image don\'t match current imgType')
-	return false
+	console.log('Something is wrong with this subreddit!')
+	process.exit(1)
   }
 }
 
@@ -109,7 +157,8 @@ const isHD = (post, minWidth, minHeight) => {
   const imgWidth = post['data']['preview']['images'][0]['source']['width']
   const imgHeight = post['data']['preview']['images'][0]['source']['height']
   if( imgWidth < minWidth || imgHeight < minHeight){
-	console.log('Image isn\'t HD')
+	// console.log('Image doesn\'t match prefered width and height... Skipping')
+	console.log('Image isn\'t HD... Skipping')
 	return false
   }else{
 	return true
@@ -118,36 +167,37 @@ const isHD = (post, minWidth, minHeight) => {
 
 
 // Get posts
-const getPosts = async (url, loops, after) => {
+const getPosts = async (url, after) => {
   const allPosts = []
-  for(let i = 0; i < loops; i++) {
-	try {
-	  const posts = await axios.get(url, {
-		headers: {
-		  'User-agent':'getWallpapers'
-		}
-	  })
-	  for (let post of posts['data']['data']['children']){
-		if( getImgType(post, imgType) ) {
-		  if(isMatchImgType(post)){
+  try {
+	const posts = await axios.get(url, {
+	  headers: {
+		'User-agent':'getWallpapers'
+	  }
+	})
+	for (let post of posts['data']['data']['children']){
+	  if( includeNSFW ){
+		if( searchForDesktop ) {
+		  if ( isImgDesktop(post) ){
 			allPosts.push(post)
 		  }
 		}else{
 		  allPosts.push(post)
 		}
+	  }else{
+		if( !isImgNSWF(post) ){
+		  allPosts.push(post)
+		}
 	  }
-	  after = posts['data']['data']['after']
-
-	}catch (err){
-	  console.log(err)
 	}
+  }catch (err){
+	console.log(err)
   }
   return allPosts
 }
 
 // Check if url is image
 const isUrlImg = imgUrl => {
-  // if (imgUrl.endsWith('.png', '.jpeg', '.jpg')){
   if ( imgUrl.endsWith('.png') || imgUrl.endsWith('.jpeg') || imgUrl.endsWith('.jpg')){
 	return true
   }else{
@@ -162,6 +212,7 @@ const isUrlTrusted = imgUrl => {
   if (lowerImgUrl.startsWith('https://i.redd.it/') || lowerImgUrl.startsWith('http://i.imgur.com/')) {
 	return true
   }else {
+	console.log('Image url isn\'t trusted... Skipping')
 	return false
   }
 }
@@ -182,9 +233,20 @@ const downloadImg = async (directory, imgUrl) => {
 	writeStream.on('finish', () => {
 	  resolve()
 	  console.log(`Image ${imgName} successfuly downloaded`)
+	  imgDownloadCount++
 	})
 	writeStream.on('error', reject)
   })
+}
+
+// Check if image is NSFW
+const isImgNSWF = post => {
+  if( post['data']['over_18']){
+	return true
+  }else{
+	console.log('Img is NSFW')
+	return false
+  }
 }
 
 // Check if image is already downloaded
@@ -194,27 +256,28 @@ const isAlreadyDownloaded = (directory, imgUrl) => {
   if(!fs.existsSync(localImgPath)) {
 	return false
   }else{
-	console.log('Image is already stored')
+	console.log('Image is already stored... Skipping')
 	return true
   }
 }
 
-
-// Main function
 const main = async () => {
-  await prepareDirectory(destDirectory)
-  const posts  = await getPosts(redditUrl, reqLoops, after)
-  for (let post of posts) {
-	let imgUrl = post['data']['url']
-	if (
-	  isUrlValid(imgUrl) &&
-	  isUrlTrusted(imgUrl) &&
-	  isUrlImg(imgUrl) &&
-	  !isAlreadyDownloaded(destDirectory, imgUrl) &&
-	  isHD(post, minWidth, minHeight)
-	){
-	  await downloadImg(destDirectory, imgUrl)
+  // await prepareDirectory(destDirectory)
+  if ( isSubredditOk(subreddit)){
+	const posts  = await getPosts(redditUrl, after)
+	for await (let post of posts) {
+	  let imgUrl = post['data']['url']
+	  if (
+		await isUrlValid(imgUrl) &&
+		// await isUrlTrusted(imgUrl) &&
+		await isUrlImg(imgUrl) &&
+		await !isAlreadyDownloaded(destDirectory, imgUrl) &&
+		await isHD(post, minWidth, minHeight)
+	  ){
+		await downloadImg(destDirectory, imgUrl)
+	  }
 	}
+	console.log(`Downloaded ${imgDownloadCount} images`)
   }
 }
 
