@@ -1,4 +1,4 @@
-# Reddit Wallapaper Downloader
+# Reddit Wallpaper Downloader
 
 # Description
 
