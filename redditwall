@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 // TODO: TESTS!
-// TODO: refactor
 
 const fs = require("fs");
 const url = require("url");
