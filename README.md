@@ -10,7 +10,7 @@ Clone the repo in your folder
 
 ```sh
 cd *your-folder*
-git clone https://github.com/mediocreeee/nodeVids.git
+git clone https://github.com/mediocreeee/redditWall.git
 ```
 
 Install all required packages via npm
